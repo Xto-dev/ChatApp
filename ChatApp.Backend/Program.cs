@@ -1,5 +1,5 @@
 using ChatApp.Backend.Controllers;
-using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Azure.SignalR;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -12,9 +12,15 @@ var services = builder.Services;
 services.AddInfrastructure(builder.Configuration);
 services.AddAutoMapper(typeof(Program));
 services.AddControllers();
+services.AddCors(opt =>
+    opt.AddDefaultPolicy(policy =>
+        policy
+            .WithOrigins(builder.Configuration["Frontend:Url"] ?? "http://localhost:5173")
+            .AllowAnyHeader()
+            .AllowAnyMethod()
+            .AllowCredentials()));
 
 var app = builder.Build();
-//app.UseHttpsRedirection();
 app.UseCors();
 app.MapHub<ChatHub>("/chatHub");
 app.MapControllers();

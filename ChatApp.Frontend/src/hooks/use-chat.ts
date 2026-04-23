@@ -38,7 +38,7 @@ export function useChat() {
       .finally(() => {
         if (!isDisposed) setIsLoadingHistory(false)
       })
-
+      
     const connection = new signalR.HubConnectionBuilder()
       .withUrl(`${BACKEND_URL}/chatHub`)
       .withAutomaticReconnect()
