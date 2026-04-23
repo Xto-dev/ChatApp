@@ -31,15 +31,13 @@ public static class StartupChatServices
         {
             services.AddDbContext<DatabaseContext>(opt => opt.UseSqlServer(azureSQL));
             signalR.AddAzureSignalR(azureSignalR);
-            //services.AddHttpClient<ISentimentService, AzureSentimentService>();
-            //services.AddScoped<IChatPublisher, AzureChatPublisher>();
+            services.AddHttpClient<ISentimentHandler, AzureSentimentService>();
         }
         else
         {
             services.AddDbContext<DatabaseContext>(opt =>
                 opt.UseSqlite("Data Source=chat_local.db"));
-            //services.AddScoped<ISentimentService, StubSentimentService>();
-            //services.AddScoped<IChatPublisher, LocalChatPublisher>();
+            services.AddScoped<ISentimentHandler, StubSentimentHandler>();
         }
 
         services.AddTransient<IMessageRepository, MessageRepository>();
