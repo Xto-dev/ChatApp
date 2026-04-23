@@ -2,7 +2,23 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import * as signalR from "@microsoft/signalr"
 
 import { BACKEND_URL } from "@/config/env"
-import type { ChatMessage, ConnectionStatus } from "@/types/chat"
+import type { ApiChatMessage, ChatMessage, ConnectionStatus } from "@/types/chat"
+
+const toSentiment = (value?: string): ChatMessage["sentiment"] => {
+  const normalized = value?.trim().toLowerCase()
+  if (normalized === "positive" || normalized === "negative" || normalized === "neutral") {
+    return normalized
+  }
+  return "neutral"
+}
+
+const normalizeMessage = (message: ApiChatMessage): ChatMessage => ({
+  id: message.id ?? crypto.randomUUID(),
+  user: message.user,
+  text: message.text ?? "",
+  createdAt: message.createdAt ?? new Date().toISOString(),
+  sentiment: toSentiment(message.sentiment ?? message.sentimentLabel),
+})
 
 export function useChat() {
   const [messages, setMessages] = useState<ChatMessage[]>([])
@@ -14,9 +30,9 @@ export function useChat() {
     let isDisposed = false
 
     fetch(`${BACKEND_URL}/api/messages`)
-      .then(r => r.json() as Promise<ChatMessage[]>)
+      .then(r => r.json() as Promise<ApiChatMessage[]>)
       .then(data => {
-        if (!isDisposed) setMessages(data.reverse())
+        if (!isDisposed) setMessages(data.map(normalizeMessage).reverse())
       })
       .catch(console.error)
       .finally(() => {
@@ -28,8 +44,8 @@ export function useChat() {
       .withAutomaticReconnect()
       .build()
 
-    connection.on("ReceiveMessage", (message: ChatMessage) => {
-      setMessages(prev => [...prev, message])
+    connection.on("ReceiveMessage", (message: ApiChatMessage) => {
+      setMessages(prev => [...prev, normalizeMessage(message)])
     })
 
     connection.onreconnecting(() => {
