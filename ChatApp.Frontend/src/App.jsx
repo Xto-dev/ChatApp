@@ -1,121 +1,91 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
+import { useState, useEffect, useRef } from 'react'
+import * as signalR from '@microsoft/signalr'
 import './App.css'
 
-function App() {
-  const [count, setCount] = useState(0)
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5124'
 
-  return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
-
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+const sentimentConfig = {
+  positive: { emoji: '😊', color: '#d4edda', label: 'Positive' },
+  negative: { emoji: '😞', color: '#f8d7da', label: 'Negative' },
+  neutral:  { emoji: '😐', color: '#f8f9fa', label: 'Neutral'  },
 }
 
-export default App
+export default function App() {
+  const [messages, setMessages] = useState([])
+  const [text, setText] = useState('')
+  const [user, setUser] = useState('')
+  const [connected, setConnected] = useState(false)
+  const connectionRef = useRef(null)
+  const bottomRef = useRef(null)
+
+  useEffect(() => {
+    fetch(`${BACKEND_URL}/api/messages`)
+      .then(r => r.json())
+      .then(data => setMessages(data.reverse()))
+      .catch(console.error)
+
+    const connection = new signalR.HubConnectionBuilder()
+      .withUrl(`${BACKEND_URL}/chatHub`)
+      .withAutomaticReconnect()
+      .build()
+
+    connection.on('ReceiveMessage', (message) => {
+      setMessages(prev => [...prev, message])
+    })
+
+    connection.start()
+      .then(() => setConnected(true))
+      .catch(console.error)
+
+    connectionRef.current = connection
+    return () => connection.stop()
+  }, [])
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages])
+
+  const sendMessage = async () => {
+    if (!text.trim() || !connected) return
+    await connectionRef.current.invoke('SendMessage', {Text: text})
+    setText('')
+  }
+
+  return (
+    <div className="chat-container">
+      <h1>💬 Real-time Chat</h1>
+      
+      <div className="messages">
+        {messages.map(msg => {
+          const s = sentimentConfig[msg.sentiment] || sentimentConfig.neutral
+          return (
+            <div key={msg.id} className="message" style={{ background: s.color }}>
+              <div className="message-header">
+                <strong>{msg.user}</strong>
+                <span className="sentiment">{s.emoji} {s.label}</span>
+                <span className="time">
+                  {new Date(msg.createdAt).toLocaleTimeString()}
+                </span>
+              </div>
+              <div className="message-text">{msg.text}</div>
+            </div>
+          )
+        })}
+        <div ref={bottomRef} />
+      </div>
+
+      <div className="input-area">
+        <input
+          placeholder="Type a message..."
+          value={text}
+          onChange={e => setText(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && sendMessage()}
+          className="input-message"
+        />
+        <button onClick={sendMessage} disabled={!connected}>
+          {connected ? 'Send' : 'Connecting...'}
+        </button>
+      </div>
+    </div>
+  )
+}
