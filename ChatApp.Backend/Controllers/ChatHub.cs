@@ -7,6 +7,7 @@ namespace ChatApp.Backend.Controllers;
 
 
 public class ChatHub(
+    IChatHubLog _log,
     IValidator<CreateMessageDto> _createMessageValidator,
     CreateMessageHandler _createMessageHandler
 ) : Hub
@@ -24,7 +25,7 @@ public class ChatHub(
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error sending message: {ex.Message}");
+            _log.SendMessageError(ex.Message);
         }
     }
 }

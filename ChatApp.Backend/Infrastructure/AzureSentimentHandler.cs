@@ -13,14 +13,15 @@ public class AzureSentimentService : ISentimentHandler
     public AzureSentimentService(HttpClient http, IConfiguration config)
     {
         _http = http;
-        _endpoint = config["AzureTextAnalytics:Endpoint"]
-            ?? throw new InvalidOperationException("AzureTextAnalytics:Endpoint not configured");
-        _key = config["AzureTextAnalytics:Key"]
-            ?? throw new InvalidOperationException("AzureTextAnalytics:Key not configured");
+        _endpoint = config["AzureTextAnalytics:Endpoint"] ?? string.Empty;
+        _key = config["AzureTextAnalytics:Key"] ?? string.Empty;
     }
 
     public async Task<SentimentResultDto> HandleAsync(string text)
     {
+        if (string.IsNullOrEmpty(_endpoint) || string.IsNullOrEmpty(_key))
+            return new SentimentResultDto { SentimentLabel = SentimentLabel.Neutral, SentimentScore = 0.5 };
+
         _http.DefaultRequestHeaders.Clear();
         _http.DefaultRequestHeaders.Add("Ocp-Apim-Subscription-Key", _key);
 
